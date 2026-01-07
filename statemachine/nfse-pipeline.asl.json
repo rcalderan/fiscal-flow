@@ -1,0 +1,80 @@
+{
+  "Comment": "NFSe Integration Pipeline for FiscalFlow",
+  "StartAt": "ProcessBackup",
+  "States": {
+    "ProcessBackup": {
+      "Type": "Task",
+      "Resource": "${ProcessorFunctionArn}",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "MoveToFailed"
+        }
+      ],
+      "Next": "CheckApprovalNeeded"
+    },
+    "CheckApprovalNeeded": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "And": [
+            { "Variable": "$.approvalRequired", "BooleanEquals": true },
+            { "StringEquals": "${RequireManualApproval}", "Value": "true" }
+          ],
+          "Next": "WaitApproval"
+        }
+      ],
+      "Default": "EmitBatch"
+    },
+    "WaitApproval": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke.waitForTaskToken",
+      "Parameters": {
+        "FunctionName": "${NotifierFunctionArn}",
+        "Payload": {
+          "type": "WAIT_APPROVAL",
+          "data.$": "$",
+          "token.$": "$$.Task.Token"
+        }
+      },
+      "Next": "EmitBatch"
+    },
+    "EmitBatch": {
+      "Type": "Task",
+      "Resource": "${EmitterFunctionArn}",
+      "Retry": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "IntervalSeconds": 10,
+          "MaxAttempts": 3,
+          "BackoffRate": 2.0
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "MoveToFailed"
+        }
+      ],
+      "Next": "NotifySuccess"
+    },
+    "NotifySuccess": {
+      "Type": "Task",
+      "Resource": "${NotifierFunctionArn}",
+      "Parameters": {
+        "type": "SUCCESS",
+        "data.$": "$"
+      },
+      "End": true
+    },
+    "MoveToFailed": {
+      "Type": "Task",
+      "Resource": "${NotifierFunctionArn}",
+      "Parameters": {
+        "type": "FAILED",
+        "error.$": "$"
+      },
+      "End": true
+    }
+  }
+}

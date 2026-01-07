@@ -1,0 +1,14 @@
+[
+  {
+    "id": "INV-001",
+    "valor": 1500.50,
+    "servico": "Consultoria TI",
+    "tomador": "Empresa A"
+  },
+  {
+    "id": "INV-002",
+    "valor": 2300.00,
+    "servico": "Desenvolvimento Software",
+    "tomador": "Empresa B"
+  }
+]

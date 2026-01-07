@@ -1,0 +1,55 @@
+version = 0.1
+
+# Local Development (dev)
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "fiscal-flow-local"
+region = "us-east-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+image_repositories = []
+resolve_s3 = true
+parameter_overrides = "Stage=\"local\" AdminEmail=\"dev@costumerental.com\" RequireManualApproval=\"false\""
+profile = "ci-fiscalflow-dev"
+
+[default.build.parameters]
+cached = true
+parallel = true
+
+[default.local_start_api.parameters]
+region = "us-east-1"
+
+# Test Environment (pre)
+[test]
+[test.deploy]
+[test.deploy.parameters]
+stack_name = "fiscal-flow-test"
+region = "us-east-1"
+confirm_changeset = false
+capabilities = "CAPABILITY_IAM"
+image_repositories = []
+resolve_s3 = true
+parameter_overrides = "Stage=\"test\" AdminEmail=\"test-alerts@costumerental.com\" RequireManualApproval=\"false\""
+profile = "ci-fiscalflow-pre"
+
+[test.build.parameters]
+cached = true
+parallel = true
+
+# Production Environment (prod)
+[prod]
+[prod.deploy]
+[prod.deploy.parameters]
+stack_name = "fiscal-flow-prod"
+region = "us-east-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+image_repositories = []
+resolve_s3 = true
+parameter_overrides = "Stage=\"prod\" AdminEmail=\"ops@costumerental.com\" RequireManualApproval=\"true\""
+profile = "ci-fiscalflow-prod"
+
+[prod.build.parameters]
+cached = true
+parallel = true

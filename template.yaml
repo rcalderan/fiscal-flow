@@ -1,0 +1,144 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: FiscalFlow - NFSe National Integration Orchestrator
+
+Parameters:
+  Stage:
+    Type: String
+    Default: local
+    AllowedValues: [local, test, prod]
+    Description: Environment stage for deployment
+  AdminEmail:
+    Type: String
+    Default: admin@costumerental.com
+    Description: Email address for administrative notifications
+  RequireManualApproval:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: Whether manual approval is required for high-value batches
+
+Mappings:
+  EnvConfig:
+    local:
+      LogLevel: DEBUG
+      Timeout: 30
+    test:
+      LogLevel: INFO
+      Timeout: 60
+    prod:
+      LogLevel: ERROR
+      Timeout: 120
+
+Resources:
+  ## S3 Bucket for Backup Storage
+  FiscalBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub fiscal-flow-${Stage}-${AWS::AccountId}
+      Tags:
+        - Key: Environment
+          Value: !Ref Stage
+        - Key: Project
+          Value: FiscalFlow
+      NotificationConfiguration:
+        EventBridgeConfiguration:
+          EventBridgeEnabled: true
+
+  ## Step Function Definition
+  NfseStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      DefinitionUri: statemachine/nfse-pipeline.asl.json
+      DefinitionSubstitutions:
+        ProcessorFunctionArn: !GetAtt ProcessorFunction.Arn
+        EmitterFunctionArn: !GetAtt EmitterFunction.Arn
+        NotifierFunctionArn: !GetAtt NotifierFunction.Arn
+        RequireManualApproval: !Ref RequireManualApproval
+      Events:
+        S3BucketEvent:
+          Type: EventBridgeRule
+          Properties:
+            EventBusName: default
+            Pattern:
+              source:
+                - aws.s3
+              detail-type:
+                - Object Created
+              detail:
+                bucket:
+                  name:
+                    - !Ref FiscalBucket
+                key:
+                  - prefix: backups/
+      Policies:
+        - LambdaInvokePolicy:
+            FunctionName: !Ref ProcessorFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref EmitterFunction
+        - LambdaInvokePolicy:
+            FunctionName: !Ref NotifierFunction
+        - S3ReadPolicy:
+            BucketName: !Ref FiscalBucket
+        - S3WritePolicy:
+            BucketName: !Ref FiscalBucket
+        - SESCrudPolicy:
+            IdentityName: !Ref AdminEmail
+
+  ## Lambdas
+  ProcessorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers/processor.handler
+      Runtime: nodejs20.x
+      Timeout: !FindInMap [EnvConfig, !Ref Stage, Timeout]
+      Environment:
+        Variables:
+          STAGE: !Ref Stage
+          LOG_LEVEL: !FindInMap [EnvConfig, !Ref Stage, LogLevel]
+          BUCKET_NAME: !Ref FiscalBucket
+      Tags:
+        Environment: !Ref Stage
+      Policies:
+        - S3ReadPolicy:
+            BucketName: !Ref FiscalBucket
+
+  EmitterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers/emitter.handler
+      Runtime: nodejs20.x
+      Timeout: !FindInMap [EnvConfig, !Ref Stage, Timeout]
+      Environment:
+        Variables:
+          STAGE: !Ref Stage
+          LOG_LEVEL: !FindInMap [EnvConfig, !Ref Stage, LogLevel]
+          BUCKET_NAME: !Ref FiscalBucket
+      Tags:
+        Environment: !Ref Stage
+      Policies:
+        - S3WritePolicy:
+            BucketName: !Ref FiscalBucket
+
+  NotifierFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers/notifier.handler
+      Runtime: nodejs20.x
+      Timeout: !FindInMap [EnvConfig, !Ref Stage, Timeout]
+      Environment:
+        Variables:
+          STAGE: !Ref Stage
+          LOG_LEVEL: !FindInMap [EnvConfig, !Ref Stage, LogLevel]
+          ADMIN_EMAIL: !Ref AdminEmail
+          BUCKET_NAME: !Ref FiscalBucket
+      Tags:
+        Environment: !Ref Stage
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !Ref FiscalBucket
+        - SESCrudPolicy:
+            IdentityName: !Ref AdminEmail

@@ -1,0 +1,27 @@
+{
+  "name": "fiscal-flow",
+  "version": "1.0.0",
+  "description": "Orquestração Serverless para NFSe Nacional",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "sam:build": "sam build",
+    "sam:deploy": "sam deploy --guided",
+    "sam:deploy:dev": "sam build && sam deploy --config-env default",
+    "sam:deploy:pre": "sam build && sam deploy --config-env test",
+    "sam:deploy:prod": "sam build && sam deploy --config-env prod",
+    "sam:deploy:local": "sam build && sam deploy --config-env default",
+    "sam:deploy:test": "sam build && sam deploy --config-env test",
+    "sam:sync": "sam sync --watch",
+    "sam:local": "sam local start-api",
+    "sam:invoke:processor": "sam local invoke ProcessorFunction -e events/s3-event.json",
+    "sam:logs": "sam logs -t",
+    "sam:logs:test": "sam logs -t --config-env test",
+    "sam:logs:prod": "sam logs -t --config-env prod"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.0.0",
+    "@aws-sdk/client-ses": "^3.0.0",
+    "@aws-sdk/client-sfn": "^3.0.0"
+  }
+}
